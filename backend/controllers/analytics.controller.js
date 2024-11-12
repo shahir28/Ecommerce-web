@@ -74,7 +74,91 @@ export const getDailySalesData = async (startDate, endDate) => {
 };
 
 function getDatesInRange(startDate, endDate) {
-	const dates = [];
+	const dates =import Order from "../models/order.model.js";
+	import Product from "../models/product.model.js";
+	import User from "../models/user.model.js";
+	
+	export const getAnalyticsData = async () => {
+		try {
+			const [totalUsers, totalProducts] = await Promise.all([
+				User.countDocuments(),
+				Product.countDocuments(),
+			]);
+	
+			const salesData = await Order.aggregate([
+				{
+					$group: {
+						_id: null,
+						totalSales: { $sum: 1 },
+						totalRevenue: { $sum: "$totalAmount" },
+					},
+				},
+			]);
+	
+			const { totalSales = 0, totalRevenue = 0 } = salesData[0] || {};
+	
+			return {
+				users: totalUsers,
+				products: totalProducts,
+				totalSales,
+				totalRevenue,
+			};
+		} catch (error) {
+			console.error("Error fetching analytics data:", error);
+			throw error;
+		}
+	};
+	
+	export const getDailySalesData = async (startDate, endDate) => {
+		try {
+			const dailySalesData = await Order.aggregate([
+				{
+					$match: {
+						createdAt: {
+							$gte: startDate,
+							$lte: endDate,
+						},
+					},
+				},
+				{
+					$group: {
+						_id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+						sales: { $sum: 1 },
+						revenue: { $sum: "$totalAmount" },
+					},
+				},
+				{ $sort: { _id: 1 } },
+			]);
+	
+			const dateArray = generateDateRange(startDate, endDate);
+	
+			return dateArray.map((date) => {
+				const foundData = dailySalesData.find((item) => item._id === date);
+				return {
+					date,
+					sales: foundData?.sales || 0,
+					revenue: foundData?.revenue || 0,
+				};
+			});
+		} catch (error) {
+			console.error("Error fetching daily sales data:", error);
+			throw error;
+		}
+	};
+	
+	function generateDateRange(startDate, endDate) {
+		const dates = [];
+		let currentDate = new Date(startDate);
+	
+		while (currentDate <= endDate) {
+			dates.push(currentDate.toISOString().split("T")[0]);
+			currentDate.setDate(currentDate.getDate() + 1);
+			currentDate = new Date(currentDate); // reset time for consistent dates
+		}
+	
+		return dates;
+	}
+	 [];
 	let currentDate = new Date(startDate);
 
 	while (currentDate <= endDate) {
